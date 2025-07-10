@@ -522,5 +522,7 @@ def get_rates():
     except Exception as e:
         return jsonify({'error': str(e)}), 500
 
-if __name__ == '__main__':
-    app.run(debug=True)
+if __name__ == "__main__":
+    # Run the Flask web server when executed as a script
+    print("Starting web server. Access the exchange rate at http://127.0.0.1:5000/")
+    app.run(host='0.0.0.0', port=5000, debug=True)
