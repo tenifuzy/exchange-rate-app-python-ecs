@@ -1,62 +1,45 @@
-from flask import Flask, render_template, request, jsonify
+import os
 import requests
-import json
+from flask import Flask, render_template_string, request, jsonify
 
 app = Flask(__name__)
 
 def get_exchange_rates(base_currency='USD'):
     """
-    Get exchange rates from a free API without requiring an API key
+    Fetch exchange rates from a free API
     """
     try:
-        # Using exchangerate-api.com free tier (no API key required)
         url = f"https://api.exchangerate-api.com/v4/latest/{base_currency}"
         response = requests.get(url, timeout=10)
-        
-        if response.status_code == 200:
-            return response.json()
-        else:
-            return None
-    except Exception as e:
+        response.raise_for_status()
+        return response.json()
+    except requests.exceptions.RequestException as e:
         print(f"Error fetching exchange rates: {e}")
         return None
 
 def convert_currency(amount, from_currency, to_currency):
     """
-    Convert currency using free exchange rate API
+    Convert currency using exchange rates
     """
-    try:
-        # Get exchange rates with base currency as 'from_currency'
-        rates_data = get_exchange_rates(from_currency)
-        
-        if rates_data and 'rates' in rates_data:
-            rates = rates_data['rates']
-            
-            # If converting to the same currency
-            if from_currency == to_currency:
-                return amount
-            
-            # Get the rate for target currency
-            if to_currency in rates:
-                rate = rates[to_currency]
-                converted_amount = amount * rate
-                return round(converted_amount, 2)
-            else:
-                return None
-        else:
-            return None
-    except Exception as e:
-        print(f"Error converting currency: {e}")
-        return None
+    if from_currency == to_currency:
+        return amount
+    
+    rates_data = get_exchange_rates(from_currency)
+    if rates_data and 'rates' in rates_data:
+        if to_currency in rates_data['rates']:
+            rate = rates_data['rates'][to_currency]
+            return round(amount * rate, 2)
+    return None
 
 @app.route('/')
 def index():
-    return '''<!DOCTYPE html>
+    return render_template_string('''
+<!DOCTYPE html>
 <html lang="en">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Teniola's Currency Converter App</title>
+    <title>Currency Converter</title>
     <style>
         * {
             margin: 0;
@@ -76,62 +59,48 @@ def index():
 
         .container {
             background: white;
-            padding: 40px;
+            padding: 2rem;
             border-radius: 20px;
             box-shadow: 0 20px 40px rgba(0,0,0,0.1);
             width: 100%;
             max-width: 500px;
-            animation: fadeIn 0.5s ease-in;
-        }
-
-        @keyframes fadeIn {
-            from { opacity: 0; transform: translateY(-20px); }
-            to { opacity: 1; transform: translateY(0); }
         }
 
         h1 {
             text-align: center;
             color: #333;
-            margin-bottom: 30px;
-            font-size: 2.5em;
-            background: linear-gradient(45deg, #667eea, #764ba2);
-            -webkit-background-clip: text;
-            -webkit-text-fill-color: transparent;
-            background-clip: text;
+            margin-bottom: 2rem;
+            font-size: 2rem;
         }
 
         .form-group {
-            margin-bottom: 20px;
+            margin-bottom: 1.5rem;
         }
 
         label {
             display: block;
-            margin-bottom: 8px;
+            margin-bottom: 0.5rem;
             color: #555;
             font-weight: 600;
-            font-size: 1.1em;
         }
 
         input, select {
             width: 100%;
-            padding: 15px;
-            border: 2px solid #e1e1e1;
+            padding: 12px;
+            border: 2px solid #e1e5e9;
             border-radius: 10px;
             font-size: 16px;
-            transition: all 0.3s ease;
-            background: #f9f9f9;
+            transition: border-color 0.3s ease;
         }
 
         input:focus, select:focus {
             outline: none;
             border-color: #667eea;
-            background: white;
-            box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
         }
 
         .currency-row {
             display: flex;
-            gap: 15px;
+            gap: 1rem;
             align-items: end;
         }
 
@@ -140,82 +109,48 @@ def index():
         }
 
         .swap-btn {
-            background: linear-gradient(45deg, #667eea, #764ba2);
+            background: #667eea;
             color: white;
             border: none;
-            padding: 15px;
-            border-radius: 50%;
+            padding: 12px;
+            border-radius: 10px;
             cursor: pointer;
             font-size: 18px;
-            width: 50px;
-            height: 50px;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            transition: all 0.3s ease;
-            margin-bottom: 5px;
+            transition: background-color 0.3s ease;
+            margin-bottom: 0;
         }
 
         .swap-btn:hover {
-            transform: rotate(180deg);
-            box-shadow: 0 5px 15px rgba(102, 126, 234, 0.3);
+            background: #5a67d8;
         }
 
         .convert-btn {
             width: 100%;
-            background: linear-gradient(45deg, #667eea, #764ba2);
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
             color: white;
             border: none;
-            padding: 18px;
+            padding: 15px;
             border-radius: 10px;
             font-size: 18px;
             font-weight: 600;
             cursor: pointer;
-            transition: all 0.3s ease;
-            margin-top: 20px;
+            transition: transform 0.2s ease;
         }
 
         .convert-btn:hover {
             transform: translateY(-2px);
-            box-shadow: 0 10px 25px rgba(102, 126, 234, 0.3);
         }
 
         .convert-btn:disabled {
-            background: #ccc;
+            opacity: 0.6;
             cursor: not-allowed;
             transform: none;
-        }
-
-        .result {
-            margin-top: 30px;
-            padding: 25px;
-            background: linear-gradient(45deg, #f093fb 0%, #f5576c 100%);
-            border-radius: 15px;
-            text-align: center;
-            color: white;
-            font-size: 18px;
-            font-weight: 600;
-            display: none;
-            animation: slideIn 0.5s ease-in;
-        }
-
-        @keyframes slideIn {
-            from { opacity: 0; transform: translateX(-20px); }
-            to { opacity: 1; transform: translateX(0); }
-        }
-
-        .result.show {
-            display: block;
-        }
-
-        .error {
-            background: linear-gradient(45deg, #ff6b6b, #ee5a52);
         }
 
         .loading {
             display: none;
             text-align: center;
-            margin-top: 20px;
+            margin: 2rem 0;
         }
 
         .spinner {
@@ -225,7 +160,7 @@ def index():
             width: 40px;
             height: 40px;
             animation: spin 1s linear infinite;
-            margin: 0 auto 10px;
+            margin: 0 auto 1rem;
         }
 
         @keyframes spin {
@@ -233,44 +168,49 @@ def index():
             100% { transform: rotate(360deg); }
         }
 
-        .rate-info {
-            margin-top: 15px;
-            padding: 15px;
-            background: rgba(255,255,255,0.2);
+        .result {
+            margin-top: 2rem;
+            padding: 1.5rem;
             border-radius: 10px;
-            font-size: 14px;
+            text-align: center;
+            opacity: 0;
+            transform: translateY(20px);
+            transition: all 0.3s ease;
         }
 
-        @media (max-width: 600px) {
-            .container {
-                padding: 20px;
-            }
-            
-            .currency-row {
-                flex-direction: column;
-                gap: 10px;
-            }
-            
-            .swap-btn {
-                align-self: center;
-                transform: rotate(90deg);
-            }
+        .result.show {
+            opacity: 1;
+            transform: translateY(0);
+            background: #f8f9fa;
+            border: 2px solid #e9ecef;
+        }
+
+        .result.error {
+            background: #f8d7da;
+            border: 2px solid #f5c6cb;
+            color: #721c24;
+        }
+
+        .rate-info {
+            margin-top: 0.5rem;
+            font-size: 0.9rem;
+            color: #666;
         }
     </style>
 </head>
 <body>
     <div class="container">
-        <h1>💱 Teniola's Currency Converter App</h1>
+        <h1>Currency Converter</h1>
         
         <form id="converterForm">
             <div class="form-group">
-                <label for="amount">Amount</label>
+                <label for="amount">Amount:</label>
                 <input type="number" id="amount" step="0.01" min="0.01" placeholder="Enter amount" required>
             </div>
 
             <div class="currency-row">
                 <div class="currency-group">
-                    <label for="fromCurrency">From</label>
+                    <label for="fromCurrency">From:</label>
                     <select id="fromCurrency" required>
                         <option value="">Select currency</option>
                         <option value="USD">USD - US Dollar</option>
@@ -286,10 +226,10 @@ def index():
                     </select>
                 </div>
 
-                <button type="button" class="swap-btn" id="swapBtn" title="Swap currencies">⇄</button>
+                <button type="button" class="swap-btn" id="swapBtn">⇄</button>
 
                 <div class="currency-group">
-                    <label for="toCurrency">To</label>
+                    <label for="toCurrency">To:</label>
                     <select id="toCurrency" required>
                         <option value="">Select currency</option>
                         <option value="USD">USD - US Dollar</option>
@@ -352,14 +292,12 @@ def index():
             }
 
             populateCurrencySelects(currencies) {
-                // Clear existing options except the first one
                 [this.fromSelect, this.toSelect].forEach(select => {
                     while (select.children.length > 1) {
                         select.removeChild(select.lastChild);
                     }
                 });
 
-                // Add currency options
                 currencies.forEach(currency => {
                     const option1 = new Option(currency, currency);
                     const option2 = new Option(currency, currency);
@@ -367,7 +305,6 @@ def index():
                     this.toSelect.add(option2);
                 });
 
-                // Set default values
                 this.fromSelect.value = 'USD';
                 this.toSelect.value = 'EUR';
             }
@@ -451,13 +388,12 @@ def index():
             }
         }
 
-        // Initialize the converter when the page loads
         document.addEventListener('DOMContentLoaded', () => {
             new CurrencyConverter();
         });
     </script>
 </body>
-</html>'''
+</html>''')
 
 @app.route('/convert', methods=['POST'])
 def convert():
@@ -491,14 +427,11 @@ def convert():
 
 @app.route('/currencies')
 def get_currencies():
-    """
-    Get list of available currencies
-    """
     try:
         rates_data = get_exchange_rates('USD')
         if rates_data and 'rates' in rates_data:
             currencies = list(rates_data['rates'].keys())
-            currencies.append('USD')  # Add base currency
+            currencies.append('USD')
             currencies.sort()
             return jsonify({'currencies': currencies})
         else:
@@ -508,9 +441,6 @@ def get_currencies():
 
 @app.route('/rates')
 def get_rates():
-    """
-    Get current exchange rates
-    """
     try:
         base_currency = request.args.get('base', 'USD').upper()
         rates_data = get_exchange_rates(base_currency)
@@ -523,6 +453,5 @@ def get_rates():
         return jsonify({'error': str(e)}), 500
 
 if __name__ == "__main__":
-    # Run the Flask web server when executed as a script
-    print("Starting web server. Access the exchange rate at http://127.0.0.1:5000/")
-    app.run(host='0.0.0.0', port=5000, debug=True)
+    port = int(os.environ.get('PORT', 5000))
+    app.run(host='0.0.0.0', port=port, debug=False)
