@@ -10,7 +10,7 @@ permissions:
   security-events: write
 
 env:
-  AWS_REGION: us-east-1
+  AWS_REGION: eu-west-2
   ECR_REPOSITORY: exchange-rate-app
   ECS_SERVICE: exchange-rate-app-service
   ECS_CLUSTER: exchange-rate-app-cluster
